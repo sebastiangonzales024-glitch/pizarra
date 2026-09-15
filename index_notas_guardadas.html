@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pizarra Escolar - Colegio Tiquipaya</title>
+  <meta name="description" content="Pizarra comunitaria de notas, deseos y propuestas de los estudiantes del Colegio Tiquipaya." />
+  <link rel="icon" type="image/png" href="https://i.imgur.com/abJpZV4.png" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Kalam:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            colegio: {
+              main: '#932a59',
+              dark: '#541230',
+              hover: '#7a1f47',
+              light: '#fdf0f5',
+              border: '#e89dbd'
+            }
+          },
+          fontFamily: {
+            ui: ['"Plus Jakarta Sans"', 'sans-serif'],
+            handwriting: ['Caveat', 'cursive'],
+            kalam: ['Kalam', 'cursive'],
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- React 18 and Babel Standalone -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* Corkboard realistic textures */
+    .bg-cork {
+      background-color: #cb9254;
+      background-image: 
+        radial-gradient(#b27538 15%, transparent 16%),
+        radial-gradient(#8f5622 15%, transparent 16%),
+        radial-gradient(rgba(255,255,255,0.15) 15%, transparent 20%),
+        radial-gradient(rgba(0,0,0,0.12) 15%, transparent 20%);
+      background-position: 0 0, 18px 18px, 12px 6px, 24px 28px;
+      background-size: 36px 36px;
+    }
+    .wood-frame {
+      box-shadow: 
+        inset 0 0 15px rgba(0,0,0,0.7),
+        0 15px 35px rgba(0,0,0,0.6),
+        0 2px 5px rgba(0,0,0,0.4);
+      border: 14px solid #5a3016;
+      border-image: linear-gradient(135deg, #7c441e, #47220c, #7c441e, #361706) 14;
+    }
+    .note-shadow {
+      box-shadow: 0 6px 14px -2px rgba(0, 0, 0, 0.22), 0 3px 6px -1px rgba(0, 0, 0, 0.15);
+    }
+    .note-shadow:hover {
+      box-shadow: 0 16px 28px -4px rgba(0, 0, 0, 0.3), 0 6px 12px -2px rgba(0, 0, 0, 0.18);
+    }
+    /* Tape effect */
+    .washi-tape {
+      background: rgba(255, 255, 255, 0.65);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+      backdrop-filter: blur(1px);
+    }
+    /* Pin 3D effect */
+    .pin-head {
+      box-shadow: 0 3px 6px rgba(0,0,0,0.4), inset 0 2px 3px rgba(255,255,255,0.6), inset 0 -2px 3px rgba(0,0,0,0.5);
+    }
+  </style>
+</head>
+<body class="bg-[#220d17] text-slate-800 antialiased font-ui min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // Default seed notes
+    const INITIAL_NOTES = [
+      {
+        id: 'seed-0',
+        studentName: 'Luciana Paredes',
+        grade: '3ro de Primaria',
+        category: 'deseo',
+        content: '¡Deseo que en 3ro de primaria tengamos más libros de cuentos ilustrados en la biblioteca y experimentos de ciencias divertidos!',
+        color: 'magenta',
+        pinColor: 'magenta',
+        sticker: 'star',
+        rotation: -1.5,
+        pinPosition: 'center',
+        likes: 35,
+        createdAt: new Date(Date.now() - 3600000 * 3).toISOString(),
+      },
+      {
+        id: 'seed-1',
+        studentName: 'Anthony Matias',
+        grade: '6to de Secundaria',
+        category: 'deseo',
+        content: '¡Deseo que nuestra promoción 2026 deje una huella inolvidable y que el colegio siempre conserve la calidez de nuestros profesores!',
+        color: 'yellow',
+        pinColor: 'red',
+        sticker: 'cap',
+        rotation: -2.2,
+        pinPosition: 'center',
+        likes: 28,
+        createdAt: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
+      },
+      {
+        id: 'seed-2',
+        studentName: 'Valentina Morales',
+        grade: '5to de Secundaria',
+        category: 'propuesta',
+        content: 'Propongo crear un club de robótica y tecnología después de clases para participar en las olimpiadas científicas de Cochabamba.',
+        color: 'blue',
+        pinColor: 'gold',
+        sticker: 'lightbulb',
+        rotation: 1.8,
+        pinPosition: 'center',
+        likes: 42,
+        createdAt: new Date(Date.now() - 3600000 * 18).toISOString(),
+      },
+      {
+        id: 'seed-3',
+        studentName: 'Camila Fernandez',
+        grade: '3ro de Secundaria',
+        category: 'agradecimiento',
+        content: 'Gracias a la profe de Literatura por inspirarnos a leer y escribir con el corazón. ¡Tiquipaya es nuestro segundo hogar!',
+        color: 'pink',
+        pinColor: 'blue',
+        sticker: 'heart',
+        rotation: -1.2,
+        pinPosition: 'left',
+        likes: 31,
+        createdAt: new Date(Date.now() - 3600000 * 48).toISOString(),
+      },
+      {
+        id: 'seed-4',
+        studentName: 'Prof. Carlos Mendoza',
+        grade: 'Plantel Docente',
+        category: 'opinion',
+        content: 'La creatividad y el respeto que demuestran nuestros alumnos cada día en las aulas hacen del Colegio Tiquipaya una verdadera familia.',
+        color: 'green',
+        pinColor: 'green',
+        sticker: 'book',
+        rotation: 2.1,
+        pinPosition: 'right',
+        likes: 56,
+        createdAt: new Date(Date.now() - 3600000 * 72).toISOString(),
+      },
+      {
+        id: 'seed-5',
+        studentName: 'Santiago Vargas',
+        grade: '4to de Primaria',
+        category: 'propuesta',
+        content: '¡Sería genial organizar una feria de reciclaje y juegos de ajedrez gigante en el recreo de primaria!',
+        color: 'orange',
+        pinColor: 'black',
+        sticker: 'trophy',
+        rotation: -0.8,
+        pinPosition: 'center',
+        likes: 22,
+        createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
+      }
+    ];
+
+    const COLOR_CONFIGS = {
+      yellow: {
+        bg: 'bg-[#fef9c3]',
+        border: 'border-[#fde047]',
+        text: 'text-[#713f12]',
+        label: 'Amarillo Clásico',
+        hex: '#fef08a'
+      },
+      pink: {
+        bg: 'bg-[#fce7f3]',
+        border: 'border-[#fbcfe8]',
+        text: 'text-[#831843]',
+        label: 'Rosa Suave',
+        hex: '#fbcfe8'
+      },
+      magenta: {
+        bg: 'bg-[#fdf0f5]',
+        border: 'border-[#e89dbd]',
+        text: 'text-[#541230]',
+        label: 'Tiquipaya Guindo',
+        hex: '#932a59'
+      },
+      blue: {
+        bg: 'bg-[#e0f2fe]',
+        border: 'border-[#bae6fd]',
+        text: 'text-[#0c4a6e]',
+        label: 'Azul Cielo',
+        hex: '#bae6fd'
+      },
+      green: {
+        bg: 'bg-[#dcfce7]',
+        border: 'border-[#bbf7d0]',
+        text: 'text-[#14532d]',
+        label: 'Verde Menta',
+        hex: '#bbf7d0'
+      },
+      orange: {
+        bg: 'bg-[#ffedd5]',
+        border: 'border-[#fed7aa]',
+        text: 'text-[#7c2d12]',
+        label: 'Naranja Cálido',
+        hex: '#fed7aa'
+      },
+      purple: {
+        bg: 'bg-[#f3e8ff]',
+        border: 'border-[#e9d5ff]',
+        text: 'text-[#581c87]',
+        label: 'Lavanda',
+        hex: '#e9d5ff'
+      },
+    };
+
+    const PIN_CONFIGS = {
+      magenta: { bg: 'bg-[#932a59]', ring: 'ring-[#541230]', label: 'Guindo Institucional' },
+      red: { bg: 'bg-red-600', ring: 'ring-red-900', label: 'Rojo' },
+      gold: { bg: 'bg-amber-500', ring: 'ring-amber-800', label: 'Dorado' },
+      blue: { bg: 'bg-sky-600', ring: 'ring-sky-950', label: 'Azul' },
+      green: { bg: 'bg-emerald-600', ring: 'ring-emerald-950', label: 'Verde' },
+      black: { bg: 'bg-slate-800', ring: 'ring-black', label: 'Negro' },
+      silver: { bg: 'bg-slate-300', ring: 'ring-slate-600', label: 'Plateado' },
+    };
+
+    const STICKER_CONFIGS = {
+      star: { emoji: '⭐', label: 'Estrella' },
+      heart: { emoji: '❤️', label: 'Corazón' },
+      book: { emoji: '📚', label: 'Libro' },
+      cap: { emoji: '🎓', label: 'Graduación' },
+      pencil: { emoji: '✏️', label: 'Lápiz' },
+      lightbulb: { emoji: '💡', label: 'Idea' },
+      trophy: { emoji: '🏆', label: 'Trofeo' },
+      none: { emoji: '🚫', label: 'Sin sticker' },
+    };
+
+    const CATEGORY_LABELS = {
+      deseo: { label: 'Deseo', icon: '✨', bg: 'bg-pink-100 text-[#932a59] border-pink-300' },
+      opinion: { label: 'Opinión', icon: '💬', bg: 'bg-sky-100 text-sky-800 border-sky-300' },
+      propuesta: { label: 'Propuesta', icon: '💡', bg: 'bg-amber-100 text-amber-900 border-amber-300' },
+      agradecimiento: { label: 'Agradecimiento', icon: '🙏', bg: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+    };
+
+    const GRADE_OPTIONS = [
+      '3ro de Primaria',
+      '4to de Primaria',
+      '5to de Primaria',
+      '6to de Primaria',
+      '1ro de Secundaria',
+      '2do de Secundaria',
+      '3ro de Secundaria',
+      '4to de Secundaria',
+      '5to de Secundaria',
+      '6to de Secundaria',
+      'Plantel Docente',
+      'Administrativo / Personal',
+      'Padre o Tutor',
+      'Otro'
+    ];
+
+    // Main App Component
+    function App() {
+      // LocalStorage persistent notes
+      const [notes, setNotes] = useState(() => {
+        try {
+          const saved = localStorage.getItem('tiquipaya_notes_v1');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+        return INITIAL_NOTES;
+      });
+
+      // Track notes created on this machine
+      const [myNoteIds, setMyNoteIds] = useState(() => {
+        try {
+          const saved = localStorage.getItem('tiquipaya_user_notes');
+          return saved ? JSON.parse(saved) : ['seed-0'];
+        } catch {
+          return ['seed-0'];
+        }
+      });
+
+      const [selectedCategory, setSelectedCategory] = useState('all');
+      const [searchQuery, setSearchQuery] = useState('');
+      const [sortBy, setSortBy] = useState('recent');
+      const [toastMessage, setToastMessage] = useState('');
+      const [selectedNote, setSelectedNote] = useState(null);
+      const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+      const [isSitesModalOpen, setIsSitesModalOpen] = useState(false);
+
+      // Persist notes
+      useEffect(() => {
+        try {
+          localStorage.setItem('tiquipaya_notes_v1', JSON.stringify(notes));
+        } catch (e) {
+          console.error(e);
+        }
+      }, [notes]);
+
+      // Persist myNoteIds
+      useEffect(() => {
+        try {
+          localStorage.setItem('tiquipaya_user_notes', JSON.stringify(myNoteIds));
+        } catch (e) {
+          console.error(e);
+        }
+      }, [myNoteIds]);
+
+      const showToast = (msg) => {
+        setToastMessage(msg);
+        setTimeout(() => setToastMessage(''), 3000);
+      };
+
+      // Add note
+      const handleCreateNote = (newNoteData) => {
+        const id = 'note-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
+        const rotation = Number(((Math.random() * 6) - 3).toFixed(1));
+        const pinPositions = ['center', 'left', 'right'];
+        const pinPosition = pinPositions[Math.floor(Math.random() * pinPositions.length)];
+
+        const fullNote = {
+          ...newNoteData,
+          id,
+          rotation,
+          pinPosition,
+          likes: 0,
+          createdAt: new Date().toISOString(),
+        };
+
+        // Guardar la nota inmediatamente en el navegador para que no se pierda al recargar.
+        setNotes((prev) => {
+          const updatedNotes = [fullNote, ...prev];
+          try {
+            localStorage.setItem('tiquipaya_notes_v1', JSON.stringify(updatedNotes));
+          } catch (e) {
+            console.error('No se pudo guardar la nota:', e);
+          }
+          return updatedNotes;
+        });
+        setMyNoteIds((prev) => {
+          const updatedIds = [id, ...prev];
+          try {
+            localStorage.setItem('tiquipaya_user_notes', JSON.stringify(updatedIds));
+          } catch (e) {
+            console.error('No se pudo guardar el ID de la nota:', e);
+          }
+          return updatedIds;
+        });
+        showToast('¡Nota clavada exitosamente en la pizarra!');
+        setIsNewModalOpen(false);
+      };
+
+      // Like note
+      const handleLike = (id, e) => {
+        if (e) e.stopPropagation();
+        setNotes((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, likes: (n.likes || 0) + 1 } : n))
+        );
+      };
+
+      // Delete note
+      const handleDelete = (id, e) => {
+        if (e) e.stopPropagation();
+        setNotes((prev) => prev.filter((n) => n.id !== id));
+        setMyNoteIds((prev) => prev.filter((myId) => myId !== id));
+        if (selectedNote && selectedNote.id === id) {
+          setSelectedNote(null);
+        }
+        showToast('Nota retirada de la pizarra.');
+      };
+
+      // Reset to defaults if needed
+      const handleResetNotes = () => {
+        if (confirm('¿Restaurar las notas predeterminadas del Colegio Tiquipaya?')) {
+          setNotes(INITIAL_NOTES);
+          setMyNoteIds(['seed-0']);
+          showToast('Pizarra restaurada');
+        }
+      };
+
+      // Download this HTML file directly from browser
+      const handleDownloadThisFile = () => {
+        const htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'index.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('¡Archivo index.html descargado con éxito!');
+      };
+
+      // Filtered notes
+      const filteredNotes = useMemo(() => {
+        let result = [...notes];
+        if (selectedCategory === 'mine') {
+          result = result.filter((n) => myNoteIds.includes(n.id));
+        } else if (selectedCategory !== 'all') {
+          result = result.filter((n) => n.category === selectedCategory);
+        }
+
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          result = result.filter(
+            (n) =>
+              n.studentName.toLowerCase().includes(q) ||
+              n.content.toLowerCase().includes(q) ||
+              n.grade.toLowerCase().includes(q)
+          );
+        }
+
+        if (sortBy === 'recent') {
+          result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        } else if (sortBy === 'popular') {
+          result.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+        } else if (sortBy === 'random') {
+          result.sort(() => 0.5 - Math.random());
+        }
+        return result;
+      }, [notes, selectedCategory, searchQuery, sortBy, myNoteIds]);
+
+      const myNotesCount = notes.filter((n) => myNoteIds.includes(n.id)).length;
+
+      return (
+        <div className="min-h-screen flex flex-col justify-between selection:bg-[#932a59] selection:text-white">
+          {/* Toast Notification */}
+          {toastMessage && (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-5 py-3 rounded-xl bg-[#932a59] text-white shadow-2xl border-2 border-pink-300 text-sm font-bold animate-bounce font-ui">
+              <span>✅</span>
+              <span>{toastMessage}</span>
+            </div>
+          )}
+
+          {/* Header */}
+          <header className="w-full bg-[#932a59] text-white shadow-lg border-b-4 border-[#541230] sticky top-0 z-40">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-col md:flex-row items-center justify-between gap-4">
+              {/* Logo & School Name */}
+              <div className="flex items-center gap-3.5 text-center md:text-left">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-white p-1 flex items-center justify-center shadow-md border-2 border-[#e89dbd] ring-2 ring-[#721d43]/50 flex-shrink-0 overflow-hidden">
+                  <img
+                    src="https://i.imgur.com/abJpZV4.png"
+                    alt="Logo Colegio Tiquipaya"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 justify-center md:justify-start">
+                    <h1 className="text-xl sm:text-2xl font-black font-ui tracking-tight text-white flex items-center gap-1.5">
+                      Colegio Tiquipaya
+                    </h1>
+                    <span className="hidden sm:inline-block px-2 py-0.5 rounded-full bg-[#721d43] text-pink-100 text-[11px] font-bold uppercase tracking-wider border border-[#b54272]/70">
+                      Pizarra Escolar
+                    </span>
+                  </div>
+                  <p className="text-xs text-pink-100 font-ui">
+                    Muro comunitario de opiniones, propuestas y deseos de nuestros estudiantes
+                  </p>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2.5 flex-wrap justify-center">
+          
+
+                {/* Clavar Nota Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsNewModalOpen(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white text-[#932a59] hover:bg-pink-50 font-bold text-xs font-ui transition-all shadow-md active:scale-95 cursor-pointer"
+                >
+                  <span className="text-base font-black leading-none">+</span>
+                  <span>Clavar Nota</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div className="bg-[#721d43] border-t border-[#932a59]/60 px-4 sm:px-6 py-2.5">
+              <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+                {/* Search */}
+                <div className="relative w-full md:w-72">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-pink-300 text-xs">🔍</span>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Buscar estudiante, curso o texto..."
+                    className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-[#541230] text-pink-100 placeholder-pink-300/70 text-xs focus:outline-hidden focus:ring-2 focus:ring-pink-300 border border-pink-400/30 font-ui"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-pink-300 hover:text-white text-xs"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Categories */}
+                <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto py-0.5 scrollbar-none">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory('all')}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold font-ui transition-all flex-shrink-0 cursor-pointer ${
+                      selectedCategory === 'all'
+                        ? 'bg-white text-[#932a59] shadow-xs'
+                        : 'bg-[#541230]/70 text-pink-200 hover:bg-[#541230]'
+                    }`}
+                  >
+                    Todas ({notes.length})
+                  </button>
+
+                  {myNotesCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCategory('mine')}
+                      className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold font-ui transition-all flex-shrink-0 cursor-pointer ${
+                        selectedCategory === 'mine'
+                          ? 'bg-amber-300 text-[#541230] font-bold shadow-xs'
+                          : 'bg-[#541230]/70 text-amber-200 hover:bg-[#541230] border border-amber-300/40'
+                      }`}
+                    >
+                      <span>🏷️</span>
+                      <span>Mis notas ({myNotesCount})</span>
+                    </button>
+                  )}
+
+                  {Object.keys(CATEGORY_LABELS).map((catKey) => {
+                    const cat = CATEGORY_LABELS[catKey];
+                    const isSelected = selectedCategory === catKey;
+                    return (
+                      <button
+                        key={catKey}
+                        type="button"
+                        onClick={() => setSelectedCategory(catKey)}
+                        className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium font-ui transition-all flex-shrink-0 cursor-pointer ${
+                          isSelected
+                            ? 'bg-white text-[#932a59] font-bold shadow-xs'
+                            : 'bg-[#541230]/70 text-pink-200 hover:bg-[#541230]'
+                        }`}
+                      >
+                        <span>{cat.icon}</span>
+                        <span>{cat.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Sort dropdown */}
+                <div className="flex items-center gap-1.5 self-end md:self-auto text-xs text-pink-200">
+                  <span className="font-semibold text-[11px] uppercase tracking-wider text-pink-300">Orden:</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="bg-[#541230] text-pink-100 text-xs rounded-lg px-2.5 py-1 border border-pink-400/30 focus:outline-hidden font-ui cursor-pointer"
+                  >
+                    <option value="recent">Más recientes</option>
+                    <option value="popular">Más apoyadas ❤️</option>
+                    <option value="random">Aleatorio</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* Stats Bar */}
+          <div className="w-full bg-[#541230] text-pink-200/90 text-xs py-2 px-4 border-b border-[#721d43]">
+            <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-3">
+                <span className="font-semibold text-white">📌 {notes.length} notas en el corcho escolar</span>
+                <span className="text-pink-400">•</span>
+                <span>Desde 3ro de Primaria a 6to de Secundaria</span>
+              </div>
+              <div className="flex items-center gap-3">
+              </div>
+            </div>
+          </div>
+
+          {/* Main Board */}
+          <main className="flex-1 py-8 px-3 sm:px-6">
+            <div className="max-w-7xl mx-auto">
+              {/* Plaque */}
+              <div className="relative max-w-md mx-auto mb-10 text-center select-none">
+                <div className="absolute -top-3 left-4 w-4 h-4 rounded-full bg-[#932a59] shadow-md border border-[#541230]" />
+                <div className="absolute -top-3 right-4 w-4 h-4 rounded-full bg-[#932a59] shadow-md border border-[#541230]" />
+
+                <div className="px-6 py-2.5 bg-gradient-to-b from-[#fffbeb] to-[#fef3c7] text-[#541230] rounded-md shadow-md border-2 border-[#932a59]/30 inline-block transform -rotate-0.5">
+                  <p className="text-xs uppercase tracking-widest font-black font-ui flex items-center justify-center gap-1.5 text-[#932a59]">
+                    ✨ Pizarra Oficial de Estudiantes ✨
+                  </p>
+                  <p className="text-[11px] text-[#721d43] font-ui font-medium">
+                    Haz clic en cualquier nota para leerla completa o darle tu apoyo ❤️
+                  </p>
+                </div>
+              </div>
+
+              {/* Corkboard Container */}
+              <div className="relative wood-frame bg-cork rounded-2xl p-6 sm:p-10 min-h-[550px] transition-all">
+                {filteredNotes.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-center relative z-10">
+                    <div className="w-20 h-20 mb-4 rounded-full bg-[#fdf0f5] flex items-center justify-center text-4xl shadow-inner border border-[#f5cadb]">
+                      {selectedCategory === 'mine' ? '🏷️' : '📝'}
+                    </div>
+                    <h3 className="text-xl font-bold font-ui text-[#541230] mb-1">
+                      {selectedCategory === 'mine'
+                        ? 'No tienes notas clavadas actualmente'
+                        : 'No hay notas en esta sección'}
+                    </h3>
+                    <p className="text-sm font-ui text-[#721d43]/90 max-w-sm mb-6">
+                      {selectedCategory === 'mine'
+                        ? 'Las notas que crees desde este dispositivo aparecerán aquí y podrás desclavarlas cuando desees.'
+                        : 'Sé el primero en dejar una opinión, propuesta o deseo para el Colegio Tiquipaya.'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setIsNewModalOpen(true)}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#932a59] text-white hover:bg-[#7a1f47] font-bold text-sm font-ui shadow-lg transition-transform active:scale-95 cursor-pointer"
+                    >
+                      <span>+</span>
+                      <span>{selectedCategory === 'mine' ? 'Clavar mi primera nota' : 'Clavar la primera nota'}</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8 items-start relative z-10">
+                    {filteredNotes.map((note) => {
+                      const isMine = myNoteIds.includes(note.id);
+                      return (
+                        <StickyNoteCard
+                          key={note.id}
+                          note={note}
+                          isMine={isMine}
+                          onSelect={() => setSelectedNote(note)}
+                          onLike={(e) => handleLike(note.id, e)}
+                          onDelete={(e) => handleDelete(note.id, e)}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </main>
+
+          {/* Footer */}
+          <footer className="w-full bg-[#15060e] border-t-2 border-[#541230] py-6 text-pink-200/80 text-xs font-ui">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3 text-center sm:text-left">
+                <div className="w-10 h-10 rounded-lg bg-white p-1 flex items-center justify-center border border-[#e89dbd] shadow-xs flex-shrink-0 overflow-hidden">
+                  <img
+                    src="https://i.imgur.com/abJpZV4.png"
+                    alt="Logo Colegio Tiquipaya"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div>
+                  <p className="font-bold text-white text-sm">
+                    Colegio Tiquipaya — Comunidad Estudiantil
+                  </p>
+                  <p className="text-[11px] text-pink-300/70">
+                    Pizarra interactiva de notas clavadas • Espacio de expresión para estudiantes desde 3ro de primaria
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 flex-wrap justify-center">
+                <button
+                  type="button"
+                  onClick={() => setIsNewModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#932a59] hover:bg-[#7a1f47] text-white text-xs font-bold cursor-pointer transition-colors shadow-xs"
+                >
+                  <span>+</span>
+                  <span>Clavar Nota</span>
+                </button>
+              </div>
+            </div>
+          </footer>
+
+          {/* New Note Modal */}
+          {isNewModalOpen && (
+            <NewNoteModal
+              onClose={() => setIsNewModalOpen(false)}
+              onSubmit={handleCreateNote}
+            />
+          )}
+
+          {/* Note Detail Modal */}
+          {selectedNote && (
+            <NoteDetailModal
+              note={selectedNote}
+              isMine={myNoteIds.includes(selectedNote.id)}
+              onClose={() => setSelectedNote(null)}
+              onLike={(e) => handleLike(selectedNote.id, e)}
+              onDelete={(e) => handleDelete(selectedNote.id, e)}
+            />
+          )}
+
+          {/* Google Sites / Export Modal */}
+          {isSitesModalOpen && (
+            <GoogleSitesModal
+              onClose={() => setIsSitesModalOpen(false)}
+              onDownloadHtml={handleDownloadThisFile}
+            />
+          )}
+        </div>
+      );
+    }
+
+    // Sticky Note Card Component
+    function StickyNoteCard({ note, isMine, onSelect, onLike, onDelete }) {
+      const [confirmDelete, setConfirmDelete] = useState(false);
+      const colorCfg = COLOR_CONFIGS[note.color] || COLOR_CONFIGS.yellow;
+      const categoryCfg = CATEGORY_LABELS[note.category] || CATEGORY_LABELS.deseo;
+      const stickerCfg = STICKER_CONFIGS[note.sticker];
+      const pinCfg = PIN_CONFIGS[note.pinColor] || PIN_CONFIGS.magenta;
+
+      const pinPosClass =
+        note.pinPosition === 'left'
+          ? 'left-6'
+          : note.pinPosition === 'right'
+          ? 'right-6'
+          : 'left-1/2 -translate-x-1/2';
+
+      return (
+        <div
+          onClick={onSelect}
+          style={{ transform: `rotate(${note.rotation}deg)` }}
+          className={`relative group cursor-pointer transition-all duration-200 hover:scale-105 hover:z-30 select-none p-5 pt-6 rounded-xs ${colorCfg.bg} ${colorCfg.text} border ${colorCfg.border} note-shadow flex flex-col justify-between min-h-[250px]`}
+        >
+          {/* 3D Pushpin */}
+          <div className={`absolute -top-3 ${pinPosClass} z-20 pointer-events-none`}>
+            <div className={`w-5 h-5 rounded-full ${pinCfg.bg} pin-head ring-2 ${pinCfg.ring}`} />
+            <div className="w-1 h-2 bg-slate-400 mx-auto -mt-0.5 opacity-80" />
+          </div>
+
+          {/* Top meta: Category and 'Tu nota' badge */}
+          <div>
+            <div className="flex items-center justify-between gap-1 mb-2">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider border shadow-2xs ${categoryCfg.bg}`}>
+                  <span>{categoryCfg.icon}</span>
+                  <span>{categoryCfg.label}</span>
+                </span>
+                {isMine && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#932a59] text-white shadow-2xs border border-[#721d43]">
+                    <span>✨</span>
+                    <span>Tu nota</span>
+                  </span>
+                )}
+              </div>
+
+              {note.sticker !== 'none' && stickerCfg && (
+                <span className="text-xl filter drop-shadow-xs" title={stickerCfg.label}>
+                  {stickerCfg.emoji}
+                </span>
+              )}
+            </div>
+
+            {/* Note text content */}
+            <p className="font-handwriting text-xl sm:text-2xl leading-snug line-clamp-5 tracking-wide my-2">
+              "{note.content}"
+            </p>
+          </div>
+
+          {/* Bottom Card Footer */}
+          <div className="mt-3 pt-3 border-t border-black/10 flex flex-col gap-1.5 font-ui">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-bold text-xs leading-tight tracking-tight">
+                  {note.studentName}
+                </p>
+                <p className="text-[11px] opacity-75 leading-tight">
+                  🎓 {note.grade}
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-1.5">
+                {/* Like button */}
+                <button
+                  type="button"
+                  onClick={onLike}
+                  className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/70 hover:bg-white text-rose-600 font-bold text-xs shadow-2xs transition-transform active:scale-125 cursor-pointer"
+                  title="Apoyar esta nota"
+                >
+                  <span>❤️</span>
+                  <span>{note.likes || 0}</span>
+                </button>
+
+                {/* Delete button (for own note) */}
+                {isMine && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmDelete(true);
+                    }}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-200 font-bold text-[11px] cursor-pointer shadow-2xs"
+                    title="Desclavar mi nota"
+                  >
+                    <span>🗑️</span>
+                    <span>Borrar</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Delete confirmation overlay */}
+          {confirmDelete && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="absolute inset-0 bg-[#541230]/95 text-white rounded-xs p-4 flex flex-col justify-center items-center text-center z-40 font-ui shadow-2xl"
+            >
+              <span className="text-2xl mb-1">🗑️</span>
+              <p className="text-sm font-bold leading-tight mb-1 text-white">
+                ¿Desclavar esta nota?
+              </p>
+              <p className="text-[11px] text-pink-200/90 leading-tight mb-3 max-w-[210px]">
+                Se retirará permanentemente tu nota de la pizarra escolar.
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirmDelete(false);
+                  }}
+                  className="px-3 py-1.5 text-xs rounded-lg bg-white/20 hover:bg-white/30 text-white font-semibold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirmDelete(false);
+                    onDelete(e);
+                  }}
+                  className="px-3.5 py-1.5 text-xs rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold shadow-md cursor-pointer transition-transform active:scale-95"
+                >
+                  Sí, borrar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Modal: Clavar Nueva Nota
+    function NewNoteModal({ onClose, onSubmit }) {
+      const [studentName, setStudentName] = useState('');
+      const [grade, setGrade] = useState('3ro de Primaria');
+      const [customGrade, setCustomGrade] = useState('');
+      const [category, setCategory] = useState('deseo');
+      const [content, setContent] = useState('');
+      const [color, setColor] = useState('magenta');
+      const [pinColor, setPinColor] = useState('magenta');
+      const [sticker, setSticker] = useState('star');
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!studentName.trim() || !content.trim()) return;
+
+        const finalGrade = grade === 'Otro' ? (customGrade.trim() || 'Estudiante') : grade;
+        onSubmit({
+          studentName: studentName.trim(),
+          grade: finalGrade,
+          category,
+          content: content.trim(),
+          color,
+          pinColor,
+          sticker,
+        });
+      };
+
+      const selectedColorCfg = COLOR_CONFIGS[color] || COLOR_CONFIGS.magenta;
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-black/60 backdrop-blur-xs">
+          <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 bg-[#932a59] text-white">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">📌</span>
+                <div>
+                  <h2 className="text-xl font-bold font-ui">Clavar Nueva Nota</h2>
+                  <p className="text-xs text-pink-100 font-ui">Colegio Tiquipaya • Espacio de Expresión Estudiantil</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-pink-200 hover:text-white text-xl font-bold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto font-ui text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Name */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Tu Nombre o Apodo: <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={studentName}
+                    onChange={(e) => setStudentName(e.target.value)}
+                    placeholder="Ej. Luciana Paredes"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-[#932a59] text-xs font-medium"
+                  />
+                </div>
+
+                {/* Grade */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Curso / Grado:
+                  </label>
+                  <select
+                    value={grade}
+                    onChange={(e) => setGrade(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-[#932a59] text-xs font-medium bg-white"
+                  >
+                    {GRADE_OPTIONS.map((g) => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {grade === 'Otro' && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Escribe tu curso o rol:</label>
+                  <input
+                    type="text"
+                    value={customGrade}
+                    onChange={(e) => setCustomGrade(e.target.value)}
+                    placeholder="Ej. Exalumno, Taller de Arte, etc."
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
+                  />
+                </div>
+              )}
+
+              {/* Category */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Tipo de Nota:
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {Object.keys(CATEGORY_LABELS).map((catKey) => {
+                    const cat = CATEGORY_LABELS[catKey];
+                    const isSelected = category === catKey;
+                    return (
+                      <button
+                        key={catKey}
+                        type="button"
+                        onClick={() => setCategory(catKey)}
+                        className={`flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-[#932a59] bg-pink-50 text-[#932a59] ring-2 ring-[#932a59]/30'
+                            : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <span>{cat.icon}</span>
+                        <span>{cat.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Content */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Tu Mensaje, Deseo o Propuesta: <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[11px] text-slate-400">{content.length}/500</span>
+                </div>
+                <textarea
+                  required
+                  rows={4}
+                  maxLength={500}
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="Escribe con respeto lo que deseas para nuestro colegio, qué mejorarías o un agradecimiento especial..."
+                  className="w-full p-3 rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-[#932a59] text-xs font-medium font-ui leading-relaxed"
+                />
+              </div>
+
+              {/* Visual customization: Note Color & Pin Color */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-pink-50/50 rounded-xl border border-pink-100">
+                {/* Note Color */}
+                <div>
+                  <label className="block text-[11px] font-bold text-[#541230] uppercase mb-1.5">Color del Papel:</label>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {Object.keys(COLOR_CONFIGS).map((cKey) => {
+                      const cfg = COLOR_CONFIGS[cKey];
+                      return (
+                        <button
+                          key={cKey}
+                          type="button"
+                          onClick={() => setColor(cKey)}
+                          title={cfg.label}
+                          className={`w-6 h-6 rounded-full border-2 transition-transform cursor-pointer ${
+                            color === cKey ? 'scale-125 border-[#932a59] ring-2 ring-[#932a59]/40' : 'border-slate-300'
+                          }`}
+                          style={{ backgroundColor: cfg.hex }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Pin Color */}
+                <div>
+                  <label className="block text-[11px] font-bold text-[#541230] uppercase mb-1.5">Chincheta (Pin):</label>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {Object.keys(PIN_CONFIGS).map((pKey) => {
+                      const cfg = PIN_CONFIGS[pKey];
+                      return (
+                        <button
+                          key={pKey}
+                          type="button"
+                          onClick={() => setPinColor(pKey)}
+                          title={cfg.label}
+                          className={`w-5 h-5 rounded-full ${cfg.bg} transition-transform cursor-pointer ${
+                            pinColor === pKey ? 'scale-125 ring-2 ring-slate-800' : 'opacity-80'
+                          }`}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Sticker */}
+                <div>
+                  <label className="block text-[11px] font-bold text-[#541230] uppercase mb-1.5">Sticker Decorativo:</label>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {Object.keys(STICKER_CONFIGS).map((sKey) => {
+                      const cfg = STICKER_CONFIGS[sKey];
+                      return (
+                        <button
+                          key={sKey}
+                          type="button"
+                          onClick={() => setSticker(sKey)}
+                          title={cfg.label}
+                          className={`p-1 rounded text-sm transition-transform cursor-pointer ${
+                            sticker === sKey ? 'bg-[#932a59] text-white scale-125' : 'hover:bg-slate-200'
+                          }`}
+                        >
+                          {cfg.emoji}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Live Preview */}
+              <div className="pt-2">
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Vista previa de cómo se verá clavada:</p>
+                <div className={`p-4 rounded-xs ${selectedColorCfg.bg} ${selectedColorCfg.text} border ${selectedColorCfg.border} shadow-sm max-w-sm mx-auto`}>
+                  <div className="flex justify-between items-center mb-1 text-xs">
+                    <span className="font-bold uppercase tracking-wider">{CATEGORY_LABELS[category].icon} {CATEGORY_LABELS[category].label}</span>
+                    <span>{STICKER_CONFIGS[sticker].emoji}</span>
+                  </div>
+                  <p className="font-handwriting text-lg leading-snug my-2 min-h-[50px]">
+                    "{content || 'Aquí se verá tu mensaje con letra manuscrita...'}"
+                  </p>
+                  <p className="font-bold text-xs pt-1 border-t border-black/10">
+                    {studentName || 'Tu Nombre'} • <span className="opacity-80 font-normal">{grade}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Modal Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!studentName.trim() || !content.trim()}
+                  className="px-6 py-2 rounded-xl bg-[#932a59] hover:bg-[#7a1f47] disabled:bg-slate-300 text-white font-bold text-xs transition-all shadow-md active:scale-95 cursor-pointer"
+                >
+                  📌 Clavar en la Pizarra
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    // Modal: Note Detail
+    function NoteDetailModal({ note, isMine, onClose, onLike, onDelete }) {
+      const [confirmDelete, setConfirmDelete] = useState(false);
+      const colorCfg = COLOR_CONFIGS[note.color] || COLOR_CONFIGS.yellow;
+      const categoryCfg = CATEGORY_LABELS[note.category] || CATEGORY_LABELS.deseo;
+      const stickerCfg = STICKER_CONFIGS[note.sticker];
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className={`p-6 sm:p-8 ${colorCfg.bg} ${colorCfg.text} border-b ${colorCfg.border}`}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${categoryCfg.bg}`}>
+                    {categoryCfg.icon} {categoryCfg.label}
+                  </span>
+                  {isMine && (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#932a59] text-white">
+                      ✨ Tu nota
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="text-slate-600 hover:text-black font-bold text-xl p-1 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {stickerCfg && stickerCfg.emoji !== '🚫' && (
+                <div className="text-3xl mb-2">{stickerCfg.emoji}</div>
+              )}
+
+              <p className="font-handwriting text-2xl sm:text-3xl leading-relaxed my-4">
+                "{note.content}"
+              </p>
+
+              <div className="pt-4 border-t border-black/10 flex justify-between items-end">
+                <div>
+                  <p className="font-bold text-base font-ui">{note.studentName}</p>
+                  <p className="text-xs opacity-85 font-ui">🎓 {note.grade}</p>
+                  <p className="text-[11px] opacity-70 font-ui mt-1">
+                    📅 {new Date(note.createdAt).toLocaleDateString('es-BO', { dateStyle: 'full' })}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={onLike}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white shadow-md text-rose-600 font-bold text-sm cursor-pointer hover:scale-105 active:scale-95 transition-all"
+                >
+                  <span>❤️</span>
+                  <span>{note.likes || 0} Apoyos</span>
+                </button>
+              </div>
+
+              {isMine && !confirmDelete && (
+                <div className="mt-4 pt-3 border-t border-black/10 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(true)}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-xs cursor-pointer border border-rose-300"
+                  >
+                    <span>🗑️</span>
+                    <span>Desclavar mi nota</span>
+                  </button>
+                </div>
+              )}
+
+              {confirmDelete && (
+                <div className="mt-3 p-3 rounded-xl bg-[#541230] text-white flex flex-col gap-2 font-ui">
+                  <p className="text-xs font-bold">¿Deseas desclavar tu nota de la pizarra?</p>
+                  <p className="text-[11px] text-pink-200">Se retirará permanentemente de la vista de todos los estudiantes.</p>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(false)}
+                      className="px-3 py-1 text-xs rounded bg-white/20 text-white cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onDelete}
+                      className="px-3.5 py-1 text-xs rounded bg-red-600 hover:bg-red-700 text-white font-bold cursor-pointer"
+                    >
+                      Sí, desclavar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Modal: Google Sites Embed & HTML Download
+    function GoogleSitesModal({ onClose, onDownloadHtml }) {
+      const [copiedCode, setCopiedCode] = useState(false);
+      const currentUrl = window.location.href;
+      const embedCode = `<iframe \n  src="${currentUrl}" \n  width="100%" \n  height="750" \n  style="border:none; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" \n  allow="clipboard-write;"\n  title="Pizarra Colegio Tiquipaya">\n</iframe>`;
+
+      const handleCopy = () => {
+        navigator.clipboard.writeText(embedCode);
+        setCopiedCode(true);
+        setTimeout(() => setCopiedCode(false), 2000);
+      };
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-black/60 backdrop-blur-xs">
+          <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-auto font-ui">
+            <div className="flex items-center justify-between px-6 py-4 bg-[#932a59] text-white">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🌐</span>
+                <div>
+                  <h2 className="text-xl font-bold">Código para Google Sites y Descarga</h2>
+                  <p className="text-xs text-pink-100">Colegio Tiquipaya • Integra o descarga la pizarra</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-pink-200 hover:text-white font-bold text-xl p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs text-slate-700">
+              {/* Box 1: Descargar archivo index.html */}
+              <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-bold text-amber-950 text-sm flex items-center gap-1.5">
+                    <span>📥</span>
+                    <span>Descargar archivo index.html completo (1 solo archivo)</span>
+                  </h4>
+                  <p className="text-amber-900/80 text-xs mt-0.5">
+                    Contiene todo el código (HTML, CSS, React, diseño de corcho, chinchetas y notas) listo para abrir sin servidores.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onDownloadHtml}
+                  className="flex-shrink-0 px-4 py-2 bg-[#932a59] hover:bg-[#7a1f47] text-white font-bold rounded-xl shadow-md cursor-pointer transition-transform active:scale-95 text-xs flex items-center gap-1.5"
+                >
+                  <span>💾</span>
+                  <span>Descargar Ahora</span>
+                </button>
+              </div>
+
+              {/* Box 2: Google Sites Iframe */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-bold text-[#541230] uppercase tracking-wider">Código HTML &lt;iframe&gt; para Google Sites:</span>
+                  <button
+                    type="button"
+                    onClick={handleCopy}
+                    className="px-3 py-1 bg-[#932a59] hover:bg-[#7a1f47] text-white rounded-lg font-bold text-xs cursor-pointer"
+                  >
+                    {copiedCode ? '¡Copiado!' : 'Copiar Código'}
+                  </button>
+                </div>
+                <pre className="p-3 bg-slate-900 text-pink-200 rounded-xl font-mono text-[11px] overflow-x-auto select-all">
+                  {embedCode}
+                </pre>
+              </div>
+
+              {/* Pasos Google Sites */}
+              <div className="p-3.5 bg-pink-50/70 rounded-xl border border-pink-200">
+                <p className="font-bold text-[#541230] mb-1.5">Instrucciones para Google Sites:</p>
+                <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-700">
+                  <li>En tu página de <strong>Google Sites</strong>, haz clic en <strong>Insertar</strong>.</li>
+                  <li>Selecciona <strong>Incorporar (&lt;&gt;)</strong> y pestaña <strong>Código para insertar</strong>.</li>
+                  <li>Pega el código anterior, pulsa <strong>Siguiente</strong> y luego <strong>Insertar</strong>.</li>
+                </ol>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-semibold cursor-pointer"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Render React App
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
